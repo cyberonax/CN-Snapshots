@@ -58,7 +58,6 @@ def main():
     nation_input = st.text_area("", placeholder="e.g.\n527097\n561490", height=150)
 
     if st.button("Fetch & Compare"):
-        # Show loading spinner while fetching data
         with st.spinner("Loading data..."):
             raw_ids = [line.strip() for line in nation_input.splitlines() if line.strip()]
             valid_ids, invalid_ids = [], []
@@ -77,15 +76,30 @@ def main():
 
             results = []
             for nid in valid_ids:
+                # Fetch first page to get name and ruler
+                page1 = fetch_history_page(nid, 1)
+                # Extract "Ruler of Nation" text
+                full_name = None
+                p_tag = page1.find("p", string=lambda t: t and " of " in t)
+                if p_tag and p_tag.find("a"):
+                    full_name = p_tag.find("a").get_text(strip=True)
+                # Split Ruler and Nation
+                ruler, nation = (full_name.split(" of ", 1) + [None])[:2] if full_name else (None, None)
+
+                # Get snapshots
                 snap1 = get_snapshot(nid, datetime.combine(date1, datetime.min.time()))
                 snap2 = get_snapshot(nid, datetime.combine(date2, datetime.min.time()))
-                results.append({
+
+                row = {
                     "Nation ID": nid,
+                    "Ruler": ruler,
+                    "Nation": nation,
                     "Date 1": date1.isoformat(),
                     **{f"{c} (D1)": snap1[c] for c in COLUMNS},
                     "Date 2": date2.isoformat(),
                     **{f"{c} (D2)": snap2[c] for c in COLUMNS}
-                })
+                }
+                results.append(row)
 
             df = pd.DataFrame(results)
             st.dataframe(df, use_container_width=True)
