@@ -1,10 +1,10 @@
-# app.py
-
 import streamlit as st
 import requests
 from bs4 import BeautifulSoup
 import pandas as pd
 from datetime import datetime
+
+st.set_page_config(layout="wide")
 
 BASE_URL = "https://cybernations.lyricalz.com/nation/{nation_id}"
 
@@ -40,17 +40,15 @@ def get_snapshot(nation_id: str, snapshot_date: datetime, max_pages: int = 5) ->
         try:
             soup = fetch_history_page(nation_id, page)
         except requests.exceptions.HTTPError:
-            # stop trying further pages if we got a 404 or similar
             break
         df = parse_table(soup)
         row = find_snapshot(df, snapshot_date)
         if row is not None:
             return {col: row[col] for col in COLUMNS}
-    # if we reach here, no data found
     return {col: None for col in COLUMNS}
 
 def main():
-    st.title("Cyber Nations: Nation Snapshot Comparator")
+    st.title("Cyber Nations | Nation Snapshot Comparator")
 
     st.sidebar.header("Snapshot Dates")
     date1 = st.sidebar.date_input("Date 1")
@@ -60,36 +58,40 @@ def main():
     nation_input = st.text_area("", placeholder="e.g.\n527097\n561490", height=150)
 
     if st.button("Fetch & Compare"):
-        # split and validate
-        raw_ids = [line.strip() for line in nation_input.splitlines() if line.strip()]
-        valid_ids, invalid_ids = [], []
-        for nid in raw_ids:
-            if nid.isdigit():
-                valid_ids.append(nid)
-            else:
-                invalid_ids.append(nid)
+        # Show loading spinner while fetching data
+        with st.spinner("Loading data..."):
+            raw_ids = [line.strip() for line in nation_input.splitlines() if line.strip()]
+            valid_ids, invalid_ids = [], []
+            for nid in raw_ids:
+                if nid.isdigit():
+                    valid_ids.append(nid)
+                else:
+                    invalid_ids.append(nid)
 
-        if not valid_ids:
-            st.error("No valid nation IDs to fetch.")
-            return
+            if invalid_ids:
+                st.warning(f"Ignoring invalid IDs (must be numeric): {', '.join(invalid_ids)}")
 
-        results = []
-        for nid in valid_ids:
-            snap1 = get_snapshot(nid, datetime.combine(date1, datetime.min.time()))
-            snap2 = get_snapshot(nid, datetime.combine(date2, datetime.min.time()))
-            results.append({
-                "Nation ID": nid,
-                "Date 1": date1.isoformat(),
-                **{f"{c} (D1)": snap1[c] for c in COLUMNS},
-                "Date 2": date2.isoformat(),
-                **{f"{c} (D2)": snap2[c] for c in COLUMNS}
-            })
+            if not valid_ids:
+                st.error("No valid nation IDs to fetch.")
+                return
 
-        df = pd.DataFrame(results)
-        st.dataframe(df, use_container_width=True)
+            results = []
+            for nid in valid_ids:
+                snap1 = get_snapshot(nid, datetime.combine(date1, datetime.min.time()))
+                snap2 = get_snapshot(nid, datetime.combine(date2, datetime.min.time()))
+                results.append({
+                    "Nation ID": nid,
+                    "Date 1": date1.isoformat(),
+                    **{f"{c} (D1)": snap1[c] for c in COLUMNS},
+                    "Date 2": date2.isoformat(),
+                    **{f"{c} (D2)": snap2[c] for c in COLUMNS}
+                })
 
-        csv = df.to_csv(index=False).encode("utf-8")
-        st.download_button("Download CSV", data=csv, file_name="cn_snapshots.csv")
+            df = pd.DataFrame(results)
+            st.dataframe(df, use_container_width=True)
+
+            csv = df.to_csv(index=False).encode("utf-8")
+            st.download_button("Download CSV", data=csv, file_name="cn_snapshots.csv")
 
 if __name__ == "__main__":
     main()
