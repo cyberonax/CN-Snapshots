@@ -69,9 +69,6 @@ def main():
             else:
                 invalid_ids.append(nid)
 
-        if invalid_ids:
-            st.warning(f"Ignoring invalid IDs (must be numeric): {', '.join(invalid_ids)}")
-
         if not valid_ids:
             st.error("No valid nation IDs to fetch.")
             return
