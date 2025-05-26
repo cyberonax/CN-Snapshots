@@ -97,6 +97,9 @@ def main():
                 results.append(row)
 
             df = pd.DataFrame(results)
+            # sort by Ruler Name and reset index
+            df = df.sort_values("Ruler Name").reset_index(drop=True)
+
             st.dataframe(df, use_container_width=True)
 
             csv = df.to_csv(index=False).encode("utf-8")
