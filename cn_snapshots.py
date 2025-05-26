@@ -25,6 +25,8 @@ def fetch_history_page(nation_id: str, page: int = 1) -> BeautifulSoup:
 
 def parse_table(soup: BeautifulSoup) -> pd.DataFrame:
     table = soup.find("table", {"class": "table-striped"})
+    if not table:
+        return pd.DataFrame()
     headers = [th.get_text(strip=True) for th in table.find("thead").find_all("th")]
     rows = [[td.get_text(strip=True) for td in tr.find_all("td")]
             for tr in table.find("tbody").find_all("tr")]
@@ -35,16 +37,20 @@ def find_snapshot(df: pd.DataFrame, target_date: datetime) -> pd.Series | None:
     matches = df[df["Last Updated"].dt.date == target_date.date()]
     return matches.iloc[0] if not matches.empty else None
 
-def get_snapshot(nation_id: str, snapshot_date: datetime, max_pages: int = 5) -> dict:
-    for page in range(1, max_pages+1):
+def get_snapshot(nation_id: str, snapshot_date: datetime) -> dict:
+    page = 1
+    while True:
         try:
             soup = fetch_history_page(nation_id, page)
         except requests.exceptions.HTTPError:
             break
         df = parse_table(soup)
+        if df.empty:
+            break
         row = find_snapshot(df, snapshot_date)
         if row is not None:
             return {col: row[col] for col in COLUMNS}
+        page += 1
     return {col: None for col in COLUMNS}
 
 def main():
@@ -79,10 +85,9 @@ def main():
                 # Fetch first page to get ruler name from <title>
                 page1 = fetch_history_page(nid, 1)
                 title_text = page1.title.get_text(strip=True) if page1.title else ""
-                # Expect format: "Nation data for Venoxis | Carnivore"
                 ruler_name = title_text.replace("Nation data for ", "").split(" |")[0]
 
-                # Get snapshots
+                # Get snapshots across all pages until found
                 snap1 = get_snapshot(nid, datetime.combine(date1, datetime.min.time()))
                 snap2 = get_snapshot(nid, datetime.combine(date2, datetime.min.time()))
 
@@ -97,7 +102,6 @@ def main():
                 results.append(row)
 
             df = pd.DataFrame(results)
-            # sort by Ruler Name and reset index
             df = df.sort_values("Ruler Name").reset_index(drop=True)
 
             st.dataframe(df, use_container_width=True)
