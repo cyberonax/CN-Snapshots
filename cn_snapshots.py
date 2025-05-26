@@ -1,5 +1,6 @@
 import streamlit as st
 import requests
+from requests.exceptions import ReadTimeout, HTTPError
 from bs4 import BeautifulSoup
 import pandas as pd
 from datetime import datetime
@@ -37,12 +38,13 @@ def find_snapshot(df: pd.DataFrame, target_date: datetime) -> pd.Series | None:
     matches = df[df["Last Updated"].dt.date == target_date.date()]
     return matches.iloc[0] if not matches.empty else None
 
-def get_snapshot(nation_id: str, snapshot_date: datetime) -> dict:
-    page = 1
-    while True:
+def get_snapshot(nation_id: str, snapshot_date: datetime, max_pages: int = 20) -> dict:
+    """Attempt to find the snapshot by iterating pages up to max_pages."""
+    for page in range(1, max_pages + 1):
         try:
             soup = fetch_history_page(nation_id, page)
-        except requests.exceptions.HTTPError:
+        except (HTTPError, ReadTimeout):
+            # stop on HTTP or timeout errors
             break
         df = parse_table(soup)
         if df.empty:
@@ -50,7 +52,7 @@ def get_snapshot(nation_id: str, snapshot_date: datetime) -> dict:
         row = find_snapshot(df, snapshot_date)
         if row is not None:
             return {col: row[col] for col in COLUMNS}
-        page += 1
+    # not found within max_pages
     return {col: None for col in COLUMNS}
 
 def main():
@@ -64,7 +66,7 @@ def main():
     nation_input = st.text_area("", placeholder="e.g.\n527097\n561490", height=150)
 
     if st.button("Fetch & Compare"):
-        with st.spinner("Loading data..."):
+        with st.spinner("Loading data (this may take a moment for older snapshots)..."):
             raw_ids = [line.strip() for line in nation_input.splitlines() if line.strip()]
             valid_ids, invalid_ids = [], []
             for nid in raw_ids:
@@ -83,11 +85,14 @@ def main():
             results = []
             for nid in valid_ids:
                 # Fetch first page to get ruler name from <title>
-                page1 = fetch_history_page(nid, 1)
-                title_text = page1.title.get_text(strip=True) if page1.title else ""
-                ruler_name = title_text.replace("Nation data for ", "").split(" |")[0]
+                try:
+                    page1 = fetch_history_page(nid, 1)
+                    title_text = page1.title.get_text(strip=True) if page1.title else ""
+                    ruler_name = title_text.replace("Nation data for ", "").split(" |")[0]
+                except (HTTPError, ReadTimeout):
+                    ruler_name = None
 
-                # Get snapshots across all pages until found
+                # Get snapshots across pages
                 snap1 = get_snapshot(nid, datetime.combine(date1, datetime.min.time()))
                 snap2 = get_snapshot(nid, datetime.combine(date2, datetime.min.time()))
 
