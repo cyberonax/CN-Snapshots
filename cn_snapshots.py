@@ -76,15 +76,11 @@ def main():
 
             results = []
             for nid in valid_ids:
-                # Fetch first page to get name and ruler
+                # Fetch first page to get ruler name from <title>
                 page1 = fetch_history_page(nid, 1)
-                # Extract "Ruler of Nation" text
-                full_name = None
-                p_tag = page1.find("p", string=lambda t: t and " of " in t)
-                if p_tag and p_tag.find("a"):
-                    full_name = p_tag.find("a").get_text(strip=True)
-                # Split Ruler and Nation
-                ruler, nation = (full_name.split(" of ", 1) + [None])[:2] if full_name else (None, None)
+                title_text = page1.title.get_text(strip=True) if page1.title else ""
+                # Expect format: "Nation data for Venoxis | Carnivore"
+                ruler_name = title_text.replace("Nation data for ", "").split(" |")[0]
 
                 # Get snapshots
                 snap1 = get_snapshot(nid, datetime.combine(date1, datetime.min.time()))
@@ -92,8 +88,7 @@ def main():
 
                 row = {
                     "Nation ID": nid,
-                    "Ruler": ruler,
-                    "Nation": nation,
+                    "Ruler Name": ruler_name,
                     "Date 1": date1.isoformat(),
                     **{f"{c} (D1)": snap1[c] for c in COLUMNS},
                     "Date 2": date2.isoformat(),
