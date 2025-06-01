@@ -49,6 +49,7 @@ def load_data():
     dates_to_try = [today, today - timedelta(days=1), today + timedelta(days=1)]
     
     for dt in dates_to_try:
+        # date_str is used for constructing the ZIP filename (e.g. "5312025")
         date_str = f"{dt.month}{dt.day}{dt.year}"
         url1 = base_url + date_str + "510001.zip"
         url2 = base_url + date_str + "510002.zip"
@@ -57,8 +58,11 @@ def load_data():
         if df is None:
             df = download_and_extract_zip(url2)
         if df is not None:
-            st.success(f"Alliance data loaded successfully from date: {date_str}")
+            # display_date is used purely for formatting the success message (e.g. "5/31/2025")
+            display_date = f"{dt.month}/{dt.day}/{dt.year}"
+            st.success(f"Alliance data loaded successfully from date: {display_date}")
             return df
+
     return None
 
 @st.cache_data(show_spinner=False)
