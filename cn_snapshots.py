@@ -169,6 +169,9 @@ def main():
                 st.error("No valid nation IDs to fetch.")
                 return
 
+            # -----------------------
+            # Build the snapshots table
+            # -----------------------
             results = []
             for nid in valid_ids:
                 # Fetch first page to get ruler name from <title>
@@ -193,13 +196,94 @@ def main():
                 }
                 results.append(row)
 
-            df = pd.DataFrame(results)
-            df = df.sort_values("Ruler Name").reset_index(drop=True)
+            df_snapshots = pd.DataFrame(results)
+            df_snapshots = df_snapshots.sort_values("Ruler Name").reset_index(drop=True)
 
-            st.dataframe(df, use_container_width=True)
+            # -----------------------
+            # Build the differences table
+            # -----------------------
+            diff_rows = []
+            for _, row in df_snapshots.iterrows():
+                nid = row["Nation ID"]
+                ruler = row["Ruler Name"]
+                # Helper to safely convert to int (or 0 if None/empty)
+                def to_int(val):
+                    try:
+                        return int(val)
+                    except Exception:
+                        return 0
 
-            csv = df.to_csv(index=False).encode("utf-8")
-            st.download_button("Download CSV", data=csv, file_name="cn_snapshots.csv")
+                # Compute differences for each metric
+                tech_d1 = to_int(row["Tech (D1)"])
+                tech_d2 = to_int(row["Tech (D2)"])
+                infra_d1 = to_int(row["Infra (D1)"])
+                infra_d2 = to_int(row["Infra (D2)"])
+                land_d1 = to_int(row["Land (D1)"])
+                land_d2 = to_int(row["Land (D2)"])
+                ns_d1 = to_int(row["NS (D1)"])
+                ns_d2 = to_int(row["NS (D2)"])
+                nukes_d1 = to_int(row["Nukes (D1)"])
+                nukes_d2 = to_int(row["Nukes (D2)"])
+                offc_d1 = to_int(row["Off. Casualties (D1)"])
+                offc_d2 = to_int(row["Off. Casualties (D2)"])
+                defc_d1 = to_int(row["Def. Casualties (D1)"])
+                defc_d2 = to_int(row["Def. Casualties (D2)"])
+
+                # Calculate net changes
+                tech_diff = tech_d2 - tech_d1
+                infra_diff = infra_d2 - infra_d1
+                land_diff = land_d2 - land_d1
+                ns_diff = ns_d2 - ns_d1
+                nukes_diff = nukes_d2 - nukes_d1
+                offc_diff = offc_d2 - offc_d1
+                defc_diff = defc_d2 - defc_d1
+
+                diff_rows.append({
+                    "Nation ID": nid,
+                    "Ruler Name": ruler,
+                    "Date 1": row["Date 1"],
+                    "Date 2": row["Date 2"],
+                    "Net Tech Gain": tech_diff if tech_diff > 0 else 0,
+                    "Net Tech Loss": tech_diff if tech_diff < 0 else 0,
+                    "Net Infra Gain": infra_diff if infra_diff > 0 else 0,
+                    "Net Infra Loss": infra_diff if infra_diff < 0 else 0,
+                    "Net Land Gain": land_diff if land_diff > 0 else 0,
+                    "Net Land Loss": land_diff if land_diff < 0 else 0,
+                    "Net NS Gain": ns_diff if ns_diff > 0 else 0,
+                    "Net NS Loss": ns_diff if ns_diff < 0 else 0,
+                    "Net Nukes Gain": nukes_diff if nukes_diff > 0 else 0,
+                    "Net Nukes Loss": nukes_diff if nukes_diff < 0 else 0,
+                    "Net Off. Casualties": offc_diff,
+                    "Net Def. Casualties": defc_diff
+                })
+
+            df_diffs = pd.DataFrame(diff_rows).sort_values("Ruler Name").reset_index(drop=True)
+
+            # -----------------------
+            # Show tables in separate collapsible sections
+            # -----------------------
+            with st.expander("Snapshot Comparison"):
+                st.dataframe(df_snapshots, use_container_width=True)
+
+            with st.expander("Net Changes (Date 2 minus Date 1)"):
+                st.dataframe(df_diffs, use_container_width=True)
+
+            # -----------------------
+            # Download as XLSX with two sheets
+            # -----------------------
+            output = io.BytesIO()
+            with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
+                df_snapshots.to_excel(writer, sheet_name="Snapshots", index=False)
+                df_diffs.to_excel(writer, sheet_name="Differences", index=False)
+                writer.save()
+            processed_data = output.getvalue()
+
+            st.download_button(
+                label="Download XLSX",
+                data=processed_data,
+                file_name="cn_snapshots_and_diffs.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
 
 if __name__ == "__main__":
     main()
