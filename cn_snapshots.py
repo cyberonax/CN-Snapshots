@@ -206,30 +206,31 @@ def main():
             for _, row in df_snapshots.iterrows():
                 nid = row["Nation ID"]
                 ruler = row["Ruler Name"]
-                # Helper to safely convert to int (or 0 if None/empty)
-                def to_int(val):
+
+                # Helper: strip commas, convert to float, or return 0.0 on failure
+                def to_number(val):
                     try:
-                        return int(val)
+                        return float(str(val).replace(",", ""))
                     except Exception:
-                        return 0
+                        return 0.0
 
                 # Compute differences for each metric
-                tech_d1 = to_int(row["Tech (D1)"])
-                tech_d2 = to_int(row["Tech (D2)"])
-                infra_d1 = to_int(row["Infra (D1)"])
-                infra_d2 = to_int(row["Infra (D2)"])
-                land_d1 = to_int(row["Land (D1)"])
-                land_d2 = to_int(row["Land (D2)"])
-                ns_d1 = to_int(row["NS (D1)"])
-                ns_d2 = to_int(row["NS (D2)"])
-                nukes_d1 = to_int(row["Nukes (D1)"])
-                nukes_d2 = to_int(row["Nukes (D2)"])
-                offc_d1 = to_int(row["Off. Casualties (D1)"])
-                offc_d2 = to_int(row["Off. Casualties (D2)"])
-                defc_d1 = to_int(row["Def. Casualties (D1)"])
-                defc_d2 = to_int(row["Def. Casualties (D2)"])
+                tech_d1 = to_number(row["Tech (D1)"])
+                tech_d2 = to_number(row["Tech (D2)"])
+                infra_d1 = to_number(row["Infra (D1)"])
+                infra_d2 = to_number(row["Infra (D2)"])
+                land_d1 = to_number(row["Land (D1)"])
+                land_d2 = to_number(row["Land (D2)"])
+                ns_d1 = to_number(row["NS (D1)"])
+                ns_d2 = to_number(row["NS (D2)"])
+                nukes_d1 = to_number(row["Nukes (D1)"])
+                nukes_d2 = to_number(row["Nukes (D2)"])
+                offc_d1 = to_number(row["Off. Casualties (D1)"])
+                offc_d2 = to_number(row["Off. Casualties (D2)"])
+                defc_d1 = to_number(row["Def. Casualties (D1)"])
+                defc_d2 = to_number(row["Def. Casualties (D2)"])
 
-                # Calculate net changes
+                # Calculate net changes as floats
                 tech_diff = tech_d2 - tech_d1
                 infra_diff = infra_d2 - infra_d1
                 land_diff = land_d2 - land_d1
@@ -243,16 +244,16 @@ def main():
                     "Ruler Name": ruler,
                     "Date 1": row["Date 1"],
                     "Date 2": row["Date 2"],
-                    "Net Tech Gain": tech_diff if tech_diff > 0 else 0,
-                    "Net Tech Loss": tech_diff if tech_diff < 0 else 0,
-                    "Net Infra Gain": infra_diff if infra_diff > 0 else 0,
-                    "Net Infra Loss": infra_diff if infra_diff < 0 else 0,
-                    "Net Land Gain": land_diff if land_diff > 0 else 0,
-                    "Net Land Loss": land_diff if land_diff < 0 else 0,
-                    "Net NS Gain": ns_diff if ns_diff > 0 else 0,
-                    "Net NS Loss": ns_diff if ns_diff < 0 else 0,
-                    "Net Nukes Gain": nukes_diff if nukes_diff > 0 else 0,
-                    "Net Nukes Loss": nukes_diff if nukes_diff < 0 else 0,
+                    "Net Tech Gain": tech_diff if tech_diff > 0 else 0.0,
+                    "Net Tech Loss": tech_diff if tech_diff < 0 else 0.0,
+                    "Net Infra Gain": infra_diff if infra_diff > 0 else 0.0,
+                    "Net Infra Loss": infra_diff if infra_diff < 0 else 0.0,
+                    "Net Land Gain": land_diff if land_diff > 0 else 0.0,
+                    "Net Land Loss": land_diff if land_diff < 0 else 0.0,
+                    "Net NS Gain": ns_diff if ns_diff > 0 else 0.0,
+                    "Net NS Loss": ns_diff if ns_diff < 0 else 0.0,
+                    "Net Nukes Gain": nukes_diff if nukes_diff > 0 else 0.0,
+                    "Net Nukes Loss": nukes_diff if nukes_diff < 0 else 0.0,
                     "Net Off. Casualties": offc_diff,
                     "Net Def. Casualties": defc_diff
                 })
