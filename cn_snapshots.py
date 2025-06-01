@@ -275,7 +275,6 @@ def main():
             with pd.ExcelWriter(output, engine="openpyxl") as writer:
                 df_snapshots.to_excel(writer, sheet_name="Snapshots", index=False)
                 df_diffs.to_excel(writer, sheet_name="Differences", index=False)
-                writer.save()
             processed_data = output.getvalue()
 
             st.download_button(
