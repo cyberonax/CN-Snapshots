@@ -269,10 +269,10 @@ def main():
                 st.dataframe(df_diffs, use_container_width=True)
 
             # -----------------------
-            # Download as XLSX with two sheets
+            # Download as XLSX with two sheets (using openpyxl)
             # -----------------------
             output = io.BytesIO()
-            with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
+            with pd.ExcelWriter(output, engine="openpyxl") as writer:
                 df_snapshots.to_excel(writer, sheet_name="Snapshots", index=False)
                 df_diffs.to_excel(writer, sheet_name="Differences", index=False)
                 writer.save()
