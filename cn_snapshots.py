@@ -3,7 +3,9 @@ import requests
 from requests.exceptions import ReadTimeout, HTTPError
 from bs4 import BeautifulSoup
 import pandas as pd
-from datetime import datetime
+from datetime import datetime, timedelta
+import zipfile
+import io
 
 st.set_page_config(layout="wide")
 
@@ -14,6 +16,50 @@ COLUMNS = [
     "NS", "Defcon", "Soldiers", "Tanks", "Cruise", "Nukes",
     "Off. Casualties", "Def. Casualties", "Votes", "Resource1", "Resource2"
 ]
+
+# -----------------------
+# DOWNLOAD & DATA LOADING FUNCTIONS
+# -----------------------
+def download_and_extract_zip(url):
+    """Download a zip file from the given URL and extract its first file as a DataFrame."""
+    try:
+        response = requests.get(url)
+        response.raise_for_status()
+    except requests.RequestException:
+        return None
+
+    try:
+        with zipfile.ZipFile(io.BytesIO(response.content)) as z:
+            file_list = z.namelist()
+            if not file_list:
+                return None
+            file_name = file_list[0]
+            with z.open(file_name) as file:
+                # Adjust delimiter and encoding as needed
+                df = pd.read_csv(file, delimiter="|", encoding="ISO-8859-1")
+                return df
+    except Exception:
+        return None
+
+@st.cache_data(show_spinner=False)
+def load_data():
+    """Try downloading data using a list of dates and URL patterns without showing debug messages."""
+    today = datetime.now()
+    base_url = "https://www.cybernations.net/assets/CyberNations_SE_Nation_Stats_"
+    dates_to_try = [today, today - timedelta(days=1), today + timedelta(days=1)]
+    
+    for dt in dates_to_try:
+        date_str = f"{dt.month}{dt.day}{dt.year}"
+        url1 = base_url + date_str + "510001.zip"
+        url2 = base_url + date_str + "510002.zip"
+        
+        df = download_and_extract_zip(url1)
+        if df is None:
+            df = download_and_extract_zip(url2)
+        if df is not None:
+            st.success(f"Alliance data loaded successfully from date: {date_str}")
+            return df
+    return None
 
 @st.cache_data(show_spinner=False)
 def fetch_history_page(nation_id: str, page: int = 1) -> BeautifulSoup:
@@ -57,13 +103,50 @@ def get_snapshot(nation_id: str, snapshot_date: datetime, max_pages: int = 20) -
 
 def main():
     st.title("Cyber Nations | Nation Snapshot Comparator")
+    
+    # -----------------------
+    # Load current alliance data and set up dropdown
+    # -----------------------
+    with st.spinner("Loading alliance data..."):
+        df_alliances = load_data()
+    if df_alliances is None or "Alliance" not in df_alliances.columns or "Nation ID" not in df_alliances.columns:
+        st.sidebar.error("Failed to load alliance data. Dropdown will default to Freehold of The Wolves.")
+        alliances = ["Freehold of The Wolves"]
+        default_index = 0
+        member_ids = []
+    else:
+        # Get list of unique alliances
+        alliances = sorted(df_alliances["Alliance"].dropna().unique())
+        # Determine default index for "Freehold of The Wolves"
+        default_index = alliances.index("Freehold of The Wolves") if "Freehold of The Wolves" in alliances else 0
+        # Initial member IDs for default alliance
+        default_alliance = alliances[default_index]
+        member_ids = df_alliances[df_alliances["Alliance"] == default_alliance]["Nation ID"].astype(str).tolist()
 
+    st.sidebar.header("Alliance Selection")
+    selected_alliance = st.sidebar.selectbox(
+        "Select Alliance",
+        alliances,
+        index=default_index
+    )
+    # Update member IDs when a different alliance is selected
+    if df_alliances is not None and "Alliance" in df_alliances.columns and "Nation ID" in df_alliances.columns:
+        member_ids = df_alliances[df_alliances["Alliance"] == selected_alliance]["Nation ID"].astype(str).tolist()
+    default_input = "\n".join(member_ids)
+
+    # -----------------------
+    # Snapshot date inputs
+    # -----------------------
     st.sidebar.header("Snapshot Dates")
     date1 = st.sidebar.date_input("Date 1")
     date2 = st.sidebar.date_input("Date 2")
 
     st.markdown("**Enter one Nation ID per line:**")
-    nation_input = st.text_area("", placeholder="e.g.\n527097\n561490", height=150)
+    nation_input = st.text_area(
+        "",
+        value=default_input,
+        height=150
+    )
 
     if st.button("Fetch & Compare"):
         with st.spinner("Loading data (this may take a moment for older snapshots)..."):
